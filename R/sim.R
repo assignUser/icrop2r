@@ -270,10 +270,7 @@ find_sow_date <- function(data,
 #' @param rain_mod Multiplicative modifier for precipitation.
 #' @return Updated weather data.
 #' @export
-initialize_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
-  ensure_var(sim_env, "temp_mod", temp_mod, !missing(temp_mod))
-  ensure_var(sim_env, "rain_mod", rain_mod, !missing(rain_mod))
-  with(sim_env, {
+prepare_weather <- function(weather, crop, albedo, rain_mod = 1, temp_mod = 0) {
     calc_snow <- function(snow_mm, rain_mm, t_max) {
       if (t_max <= 1) {
         snow_mm <- snow_mm + rain_mm
@@ -289,7 +286,7 @@ initialize_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
       return(snow_mm)
     }
 
-    data <- data %>%
+    weather %>%
       mutate(
         t_min = t_min + temp_mod,
         t_max = t_max + temp_mod,
@@ -297,8 +294,8 @@ initialize_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
         average_temp = (t_max + t_min) / 2,
         daily_temp_unit = calculate_daily_temp_unit(
           average_temp,
-          TBD, TCD,
-          TP1D, TP2D
+          crop$TBD, crop$TCD,
+          crop$TP1D, crop$TP2D
         ),
         # TODO where does the formula & 0.4 magic number come from
         snow_mm = purrr::accumulate2(rain_mm, t_max, calc_snow, .init = 0) %>%
@@ -316,12 +313,23 @@ initialize_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
         days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm),
         potential_et = calculate_potential_et(t_min, t_max, srad, albedo, 0)
       )
-  })
 }
 
 # use with fresh sim_env to pre-calc all values possible & necessary to find sow date
 calculate_fallow_data <- function(sim_env) {
-  initialize_weather(sim_env)
+  prepare_weather(sim_env)
   calculate_fallow_water(sim_env)
   invisible(sim_env)
 }
+
+# Ablauf
+# load weather
+# load crops
+# load/gen soil
+# calc_fallow
+# find_sowing_date
+# simulation
+#   phenology
+#   lai
+#   dry matter
+#   water -> no water, rain fed, irrigated (auto/fixed)

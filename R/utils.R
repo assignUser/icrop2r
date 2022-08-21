@@ -19,7 +19,7 @@ create_sim_env <- function(crop, soil, weather, management = NULL, .env = parent
   sim_env$data <- weather
 
   with(sim_env, {
-    #TODO add management
+    # TODO add management
     MAI <- MAI1 <- 0.9
     # water
     hydration_depth <- min(hydration_depth, soil_depth)
@@ -44,12 +44,22 @@ create_sim_env <- function(crop, soil, weather, management = NULL, .env = parent
     CO2RUE <- RUE_CO2 / RUE_385
     # TODO var naming scheme CONSTs
     transpiration_efficiency <- TEC * CO2RUE
+    # Phenology
+    DAP <- NDS <- CTU <- DAYT <- SRAINT <- STMINT <-
+      STMAXT <- SSRADT <- SUMETT <- DAY3 <- SRAIN3 <- STMIN3 <-
+      STMAX3 <- SSRAD3 <- SUMET3 <- DAY2 <- SRAIN2 <- STMIN2 <-
+      STMAX2 <- SSRAD2 <- SUMET2 <- 0
+    # water stress factor development seneacence
+    WSFDS <- 1
 
-
-
+    # Crop LAI
+    PART1 <- log((1 / y1 - 1) / (1 / x1))
+    PART2 <- log((1 / y2 - 1) / (1 / x2))
+    BL <- (PART2 - PART1) / (x1 - x2)
+    AL <- PART1 + BL * x1
     # TODO create CONSTs and setup dataframe with all cols
   })
-  
+
   sim_env
 }
 
