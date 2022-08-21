@@ -251,49 +251,61 @@ find_sow_date <- function(find_sowing_Date = 1, weather) {
 #' Update Weather
 #'
 #' Updates the weather with modifiers and calculates snow and snow melt.
-#' @param weather Weather data.
-#' @param rain_mm Precipitation in mm.
+#' @param sim_env Simulation environment created with [create_sim_env()].
 #' @param temp_mod Additive modifier for temperature.
 #' @param rain_mod Multiplicative modifier for precipitation.
 #' @return Updated weather data.
 #' @export
-update_weather <- function(weather, temp_mod = 0, rain_mod = 1) {
-  calc_snow <- function(snow_mm, rain_mm, t_max) {
-    if (t_max <= 1) {
-      snow_mm <- snow_mm + rain_mm
-    }
-    return(snow_mm)
-  }
+update_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
+  ensure_var(sim_env, "temp_mod", temp_mod, !missing(temp_mod))
+  ensure_var(sim_env, "rain_mod", rain_mod, !missing(rain_mod))
+  with(sim_env, {
+    
 
-  calc_snow_melt <- function(snow_mm, snow_melt, t_max) {
-    if (t_max >= 1) {
-      snow_melt <- min(snow_melt, snow_mm)
-      snow_mm <- max(snow_mm - snow_melt, 0)
+    calc_snow <- function(snow_mm, rain_mm, t_max) {
+      if (t_max <= 1) {
+        snow_mm <- snow_mm + rain_mm
+      }
+      return(snow_mm)
     }
-    return(snow_mm)
-  }
 
-  weather %>%
-    mutate(
-      t_min = t_min + temp_mod,
-      t_max = t_max + temp_mod,
-      rain_mm = rain_mm * rain_mod,
-      average_temp = (t_max + t_min) / 2,
-      # TODO where does the formula & 0.4 magic number come from
-      snow_melt = ifelse(t_max > 1, t_max + rain_mm * 0.4, 0),
-      snow_mm = purrr::accumulate2(rain_mm, t_max, calc_snow, .init = 0) %>%
-        unlist() %>%
-        tail(-1)
-    ) %>%
-    mutate(
-      rain_mm = ifelse(t_max <= 1, 0, rain_mm),
-      snow_mm = purrr::accumulate2(snow_melt, t_max, calc_snow_melt, .init = 0) %>%
-        unlist() %>%
-        tail(-1),
-    )
+    calc_snow_melt <- function(snow_mm, snow_melt, t_max) {
+      if (t_max >= 1) {
+        snow_melt <- min(snow_melt, snow_mm)
+        snow_mm <- max(snow_mm - snow_melt, 0)
+      }
+      return(snow_mm)
+    }
+
+    data <- data %>%
+      mutate(
+        t_min = t_min + temp_mod,
+        t_max = t_max + temp_mod,
+        rain_mm = rain_mm * rain_mod,
+        average_temp = (t_max + t_min) / 2,
+        daily_temp_unit = calculate_daily_temp_unit(
+          average_temp,
+          temp_min, temp_max,
+          ideal_temp_min, ideal_temp_max
+        ),
+        # TODO where does the formula & 0.4 magic number come from
+        snow_melt = ifelse(t_max > 1, t_max + rain_mm * 0.4, 0),
+        snow_mm = purrr::accumulate2(rain_mm, t_max, calc_snow, .init = 0) %>%
+          unlist() %>%
+          tail(-1)
+      ) %>%
+      mutate(
+        rain_mm = ifelse(t_max <= 1, 0, rain_mm),
+        snow_mm = purrr::accumulate2(snow_melt, t_max, calc_snow_melt, .init = 0) %>%
+          unlist() %>%
+          tail(-1),
+        irrigation_mm = 0,
+        days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm)
+      )
+  })
 }
 
-phenology <- function(ini) {
+phenology <- function(crop, weather, ini) {
   if (ini == 0) {
     DAP <- NDS <- CTU <- DAYT <- SRAINT <- STMINT <-
       STMAXT <- SSRADT <- SUMETT <- DAY3 <- SRAIN3 <- STMIN3 <-
@@ -304,22 +316,7 @@ phenology <- function(ini) {
     ini <- 1
   }
 
-  # Temperature unit calculation
-  if (!average_temp %in% temp_min:temp_max) {
-    # temp outside of growing window
-    tempfun <- 0
-  } else if (average_temp > temp_min && average_temp < ideal_temp_min) {
-    # temp below ideal growing window. tempfun = modifier based how
-    # far outside ideal temp range
-    tempfun <- (average_temp - temp_min) / (ideal_temp_min - temp_min)
-  } else if (average_temp > ideal_temp_max && average_temp < temp_max) {
-    # temp over ideal growing windows
-    tempfun <- (temp_max - average_temp) / (temp_max - ideal_temp_max)
-  } else if (average_temp %in% ideal_temp_min:ideal_temp_max) {
-    tempfun <- 1
-  }
-
-  daily_temp_unit <- (ideal_temp_min - temp_min) * tempfun
+  daily_temp_unit <- calculate_daily_temp_unit(average_temp, temp_min, temp_max, ideal_temp_min, ideal_temp_max)
 
   if (NDS > scenario$crop$fremr) {
     daily_temp_unit <- daily_temp_unit * water_stress_development

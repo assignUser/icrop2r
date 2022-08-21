@@ -15,7 +15,8 @@ Config/testthat/edition: 3
 Imports: 
     dplyr,
     lubridate,
-    purrr
+    purrr,
+    withr
 Depends: 
     R (>= 2.10)
 LazyData: true
