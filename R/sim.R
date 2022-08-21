@@ -130,7 +130,7 @@ main_loop <- function(scenarios) {
   }
 }
 
-weather <- read_csv_arrow("C:\\Users\\jacob\\Downloads\\SSM-iCrop2\\Weather\\SEM_Garmsar_40758.csv", skip = 9)
+
 
 #' Get sowing window
 #'
@@ -159,6 +159,7 @@ nth_rain_free <- function(weather, n) {
   starts <- ends - lengths + 1
   data.frame(starts, ends)[ok, ]
 }
+
 find_sow_date <- function(find_sowing_Date = 1, weather) {
   # instead of having a long if else chain use function objects with fixed api
   # find simulation start day
@@ -256,12 +257,10 @@ find_sow_date <- function(find_sowing_Date = 1, weather) {
 #' @param rain_mod Multiplicative modifier for precipitation.
 #' @return Updated weather data.
 #' @export
-update_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
+initialize_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
   ensure_var(sim_env, "temp_mod", temp_mod, !missing(temp_mod))
   ensure_var(sim_env, "rain_mod", rain_mod, !missing(rain_mod))
   with(sim_env, {
-    
-
     calc_snow <- function(snow_mm, rain_mm, t_max) {
       if (t_max <= 1) {
         snow_mm <- snow_mm + rain_mm
@@ -285,86 +284,31 @@ update_weather <- function(sim_env, temp_mod = 0, rain_mod = 1) {
         average_temp = (t_max + t_min) / 2,
         daily_temp_unit = calculate_daily_temp_unit(
           average_temp,
-          temp_min, temp_max,
-          ideal_temp_min, ideal_temp_max
+          TBD, TCD,
+          TP1D, TP2D
         ),
         # TODO where does the formula & 0.4 magic number come from
-        snow_melt = ifelse(t_max > 1, t_max + rain_mm * 0.4, 0),
         snow_mm = purrr::accumulate2(rain_mm, t_max, calc_snow, .init = 0) %>%
           unlist() %>%
-          tail(-1)
+          tail(-1),
+        snow_melt = ifelse(t_max > 1, pmin(t_max + rain_mm * 0.4, snow_mm), 0),
       ) %>%
       mutate(
-        rain_mm = ifelse(t_max <= 1, 0, rain_mm),
-        snow_mm = purrr::accumulate2(snow_melt, t_max, calc_snow_melt, .init = 0) %>%
-          unlist() %>%
-          tail(-1),
+        rain_mm = ifelse(t_max <= 1, 0, rain_mm + snow_melt),
+        snow_mm = ifelse(t_max > 1,
+          snow_mm - snow_melt, #TODO test not negative
+          snow_mm
+        ),
         irrigation_mm = 0,
-        days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm)
+        days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm),
+        potential_et = calculate_potential_et(t_min, t_max, srad, albedo, 0)
       )
   })
 }
 
-phenology <- function(crop, weather, ini) {
-  if (ini == 0) {
-    DAP <- NDS <- CTU <- DAYT <- SRAINT <- STMINT <-
-      STMAXT <- SSRADT <- SUMETT <- DAY3 <- SRAIN3 <- STMIN3 <-
-      STMAX3 <- SSRAD3 <- SUMET3 <- DAY2 <- SRAIN2 <- STMIN2 <-
-      STMAX2 <- SSRAD2 <- SUMET2 <- 0
-    # water stress factor development seneacence
-    water_stress_development <- WSFDS <- 1
-    ini <- 1
-  }
-
-  daily_temp_unit <- calculate_daily_temp_unit(average_temp, temp_min, temp_max, ideal_temp_min, ideal_temp_max)
-
-  if (NDS > scenario$crop$fremr) {
-    daily_temp_unit <- daily_temp_unit * water_stress_development
-  }
-  # cummulative temp unit
-  CTU <- CTU + daily_temp_unit
-  # normalized development score
-  NDS <- CTU / scenario$crop$tuhar
-  # days already processed?
-  DAP <- DAP + 1
-
-  # Updating day counters
-  if (NDS < scenario$crop$frbsg) days2BSG <- DAP + 1
-  if (NDS < scenario$crop$frtsg) days2TSG <- DAP + 1
-  if (NDS < 1) days2HAR <- DAP + 1
-
-  # Stop if plants are fully grown or maximum time reached
-  if (NDS >= 1 || doy == scenario$management$latest_harvest_doy) MAT <- 1
-
-  # the following bit calculates sums for certain periods during the growth cycle
-  # only used to printout in summary -> dplyr
-}
-
-crop_LAI <- function() {
-  if (iniLAI) {
-    PART1 <- log((1 / y1LAI - 1) / (1 / x1NDS))
-    PART2 <- log((1 / y2LAI - 1) / (1 / x2NDS))
-    BL <- (PART2 - PART1) / (x1NDS - x2NDS)
-    AL <- PART1 + BL * x1NDS
-    LAI1 <- LAI2 <- LAI <- MXXLAI <- 0
-    iniLAI <- FALSE
-  }
-
-  # daily INcrease in LAI
-  GLAI <- 0
-  # daily decrease leaf area increase
-  DLAI <- 0
-
-  if (NDS >= fremr && NDS < frbls) {
-    # between emergence and effective seed growth (bsg/bls)
-    LAI2 <- NDS / (NDS + exp(AL - BL * NDS)) * LAIMX
-    GLAI <- (LAI2 - LAI1) * WSFL
-    LAI1 <- LAI2
-    BLSLAI <- LAI # save value of LAI at BLS (there is abetter wy)
-  } else if (NDS >= frBLS) {
-    LAI2 <- BLSLAI * ((1.000001 - NDS) / (1 - frBLS))^SRATE
-    DLAI <- (LAI - LAI2) * WSFDS
-  }
-
-  # frost n heat
+# use with fresh sim_env to pre-calc all values possible & necessary to find sow date
+calculate_fallow_data <- function(sim_env) {
+  initialize_weather(sim_env)
+  calculate_fallow_water(sim_env)
+  invisible(sim_env)
 }

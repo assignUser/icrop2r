@@ -3,7 +3,7 @@
 # LL = lower limit -> tot wasser: DUL - EXTR
 # SAT = GPV
 
-#' convert gesättigte Wasserleitf\ahigkeit to CN runoff curve number
+#' convert gesättigte Wasserleitfähigkeit to CN runoff curve number
 #' @param kf gesättigte Wasserleitfähigkeit in cm/d
 #'
 kf2CN <- function(kf) {
@@ -32,13 +32,14 @@ german_soil <- function(name, GPV, LK, nFK, kf, we,
                         albedo = 0.1,
                         drain_factor = NULL,
                         sat_drain_factor = 0.5,
-                        slope = 10) {
+                        slope = 10,
+                        hydration_depth = 600) {
   # this is only a rough approximation
   cn <- kf2CN(kf)
   if (is.null(drain_factor)) {
     drain_factor <- round(cn * -0.0291 + 2.6139, 2)
   }
-
+  stopifnot(GPV >= LK + nFK, is.character(name))
   list(
     name = name,
     soil_depth = we * 10, # maximum depth for roots to grow to in mm
@@ -51,69 +52,95 @@ german_soil <- function(name, GPV, LK, nFK, kf, we,
     extractable_water = nFK,
     lower_limit = GPV - LK - nFK,
     sat_drain_factor = sat_drain_factor,
-    slope = slope
+    slope = slope,
+    hydration_depth = hydration_depth
   )
 }
 
-soil_water <- function() {
-  rain_drain_evaporation()
-  irrigation()
-  transpiration()
-}
-
-#' @param MAI Moisture availability index. Starting moisture for simulation.
-drain <- function(soil, water = initialize_water(soil)) {
-  within(water, {
-    drain_top_layer <- 0
-    if (current_usable_water_top > maximum_usable_water_top) {
-      drain_top_layer <- (current_usable_water_top - maximum_usable_water_top) * soil$drain_factor
-    }
-
-    drain_hydration_depth <- 0
-    if (current_usable_water_hd > maximum_usable_water_hd) {
-      drain_hydration_depth <- (current_usable_water_hd - maximum_usable_water_hd) * soil$drain_factor
-    }
-
-    drain_transpirable <- 0
-    if (current_transpirable_water > maximum_transpirable_water) {
-      drain_transpirable <- (current_transpirable_water - maximum_transpirable_water) * soil$drain_factor
-    }
-
-    water_below_roots <- max(water_below_roots + drain_transpirable - root_growth_water(), 0)
+soil_water <- function(sim_env) { # NO
+  with(sim_env, {
+    data <- data %>% mutate(
+      irrigation_mm = 0, # TODO make conditional/setup structure in the beginning
+      et_LAI = 0, # TODO make conditional/setup structure in the beginning
+      days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm),
+      potential_et = calculate_potential_et(t_min, t_max, srad, albedo, et_LAI),
+      # TODO water
+      soil_evaporation = calculate_soil_evaporation(
+        potential_et,
+        days_since_wetting,
+        fraction_transpirable_water, current_usable_water_top,
+        et_LAI
+      )
+    )
   })
 }
+
+
+drain <- function(current, maximum, drain_factor = get("drain_factor", pf())) {
+  ifelse(current > maximum,
+    (current - maximum) * drain_factor,
+    0
+  )
+  # water_below_roots <- max(water_below_roots + drain_transpirable - root_growth_water(), 0)
+}
+
 
 calculate_fallow_water <- function(sim_env, hydration_depth = 600, MAI = 0.9, root_depth = 0) {
   ensure_var(sim_env, "hydration_depth", hydration_depth)
   ensure_var(sim_env, "MAI", MAI)
 
   with(sim_env, {
-    hydration_depth <- min(hydration_depth, soil_depth)
-    maximum_usable_water_top <- depth_top_layer * extractable_water
-    maximum_usable_water_hd <- hydration_depth * extractable_water
-    initial_usable_water_hd <- hydration_depth * extractable_water * MAI
-    initial_usable_water_top <- depth_top_layer * extractable_water * MAI
-    initial_water_below_roots <- soil_depth * extractable_water * MAI
-    lower_limit_hd <- hydration_depth * lower_limit
-    drained_upper_limit_hd <- hydration_depth * drained_upper_limit
-    saturation_hd <- hydration_depth * saturation
-    initial_water_hd <- lower_limit_hd + initial_usable_water_hd
+    # data <- data %>% mutate(
+    #   current_usable_water_top = initial_usable_water_top,
+    #   current_usable_water_hd = initial_usable_water_hd,
+    #   total_water_hd = initial_water_hd,
+    #   current_water_below_roots = initial_water_below_roots,
+    #   current_transpirable_water = 0,
+    #   irrigation_mm = 0
+    # )
+    days <- nrow(data)
+    current_usable_water_top <- current_usable_water_hd <- double(days)
+    fraction_usable_water_top <- fraction_usable_water_hd <- double(days)
+    total_water_top <- total_water_hd <- double(days)
+    current_top <- initial_usable_water_top
+    current_hd <- initial_usable_water_hd
+    drain_top <- drain_hd <- double(days)
+    transpiration <- transpiration_top <- 0
 
-    data <- data %>% mutate(
-      current_usable_water_top = initial_usable_water_top,
-      current_usable_water_hd = initial_usable_water_hd,
-      water_hd = initial_water_hd,
-      current_water_below_roots = initial_water_below_roots,
-      current_transpirable_water = 0
-    )
+    for (day in seq_len(days)) {
+      total_top <- lower_limit_top + current_top
+      total_hd <- lower_limit_hd + current_hd
+      drain_top[[day]] <- drain(current_top, maximum_usable_water_top)
+      drain_hd[[day]] <- drain(current_hd, maximum_usable_water_hd)
+      # drain_transp
+      rain <- data$rain_mm[[day]]
+      irrigation <- data$irrigation_mm[[day]]
+      s_runoff <- surface_runoff(current_hd, rain, )
+      runoff <- s_runoff + depth_runoff(total_hd, drain_hd[[day]], s_runoff)
+      evaporation <- calculate_soil_evaporation(
+        data$potential_et[[day]], data$days_since_wetting[[day]],
+        0, current_top, 0, 0
+      )
+      fixed_change <- rain + irrigation - runoff - evaporation
+
+      current_top <- current_top - drain_top[[day]] - transpiration_top + fixed_change
+      current_top <- max(current_top, 0)
+      current_usable_water_top[[day]] <- current_top
+      fraction_usable_water_top[[day]] <- current_top / maximum_usable_water_top
+      total_water_top[[day]] <- lower_limit_top + current_top
+
+      current_hd <- current_hd - drain_hd[[day]] - transpiration + fixed_change
+      current_hd <- max(current_hd, 0)
+      fraction_usable_water_hd[[day]] <- current_hd / maximum_usable_water_hd
+      total_water_hd[[day]] <- lower_limit_hd + current_hd
+    }
   })
-
 
   # maximum_transpirable_water = root_depth * soil$extractable_water,
   # current_transpirable_water = root_depth * soil$extractable_water
 }
 
-root_growth_water <- function(daily_temp_unit,
+root_growth_water <- function(daily_temp_unit, # TODO
                               potential_root_growth = crop$GRTDP,
                               frBRG = crop$frBRG,
                               frTRG = crop$frTRG,
@@ -121,8 +148,8 @@ root_growth_water <- function(daily_temp_unit,
                               NDS,
                               dry_matter_production,
                               root_depth,
-                              extractable_water = soil$extractable_water,
-                              soil_depth = soil$soil_depth,
+                              extractable_water = extractable_water,
+                              soil_depth = soil_depth,
                               water_below_roots = water$water_below_roots) {
   actual_root_growth <- potential_root_growth * daily_temp_unit
   if (NDS < frBRG ||
@@ -137,32 +164,45 @@ root_growth_water <- function(daily_temp_unit,
   root_water <- max(actual_root_growth * extractable_water, water_below_roots)
 }
 
-run_off <- function(CN, et_LAI, rainfed, slope, KET = 0.5) {
+surface_runoff <- function(current_usable_water_hd, rain_mm,
+                           CN = get("CN", pf()),
+                           maximum_usable_water_hd = get("maximum_usable_water_hd", pf()),
+                           et_LAI = get("et_LAI", pf()),
+                           slope = get("slope", pf()), rain_fed = TRUE) {
+  if (!rain_fed) {
+    return(0)
+  }
+  if(missing(et_LAI)) et_LAI <- 0
+  KET <- 0.5
   runoff <- 0
-  # Surface runoff. Only for rainfed -> assumption irrigation is well managed so no "waste"
-  if (rainfed) {
-    # TODO origin of formulae?
-    CN2 <- CN * exp(0.00673 * (100 - CN))
-    CNS <- 0.333 * (CN2 - CN) * (1 - 2 * exp(-13.86 * slope)) + CN
-    cover <- (1 - exp(-KET * et_LAI)) * 100
-    CNC <- CNS - cover * 0.25
-    if ((CNS - CNC) > 20) CNS <- CNS - 20
-    CN_ <- CNC - (20 * (100 - CNC)) / (100 - CNC + exp(2.533 - 0.0636 * (100 - CNC)))
-    S_max <- 254 * (100 / CN_ - 1)
-    S <- S_max * (1 - current_usable_water_hd / (1.12 * maximum_usable_water_hd))
+  # Surface runoff. Only for rain fed -> assumption irrigation is well managed so no "waste"
+  # TODO origin of formulae?
+  CN2 <- CN * exp(0.00673 * (100 - CN))
+  CNS <- 0.333 * (CN2 - CN) * (1 - 2 * exp(-13.86 * slope)) + CN
+  cover <- (1 - exp(-KET * et_LAI)) * 100
+  CNC <- CNS - cover * 0.25
+  if ((CNS - CNC) > 20) CNS <- CNS - 20
+  CN_ <- CNC - (20 * (100 - CNC)) / (100 - CNC + exp(2.533 - 0.0636 * (100 - CNC)))
+  S_max <- 254 * (100 / CN_ - 1)
+  S <- S_max * (1 - current_usable_water_hd / (1.12 * maximum_usable_water_hd))
 
-    if (rain_mm > 0.2 * S) {
-      runoff <- ((rain_mm - 0.2 * S)^2) / (rain_mm + 0.8 * S)
-    }
+  if (rain_mm > 0.2 * S) {
+    runoff <- ((rain_mm - 0.2 * S)^2) / (rain_mm + 0.8 * S)
   }
+  runoff
+}
 
-  # From saturated soil under rainfed and irrigated land (excl. rice)
+depth_runoff <- function(total_water_hd, drain_hd, surface_runoff = 0, saturation_hd = get("saturation_hd", pf()),
+                         min_water_height = 0, sat_drain_factor = get("sat_drain_factor", pf()),
+                         slope = get("slope", pf()),
+                         KET = 0.5) {
+  # From saturated soil under rain fed and irrigated land (excl. rice)
   runoff_hd <- 0
-  if ((water_hd - drain_hd - runoff) > saturation_hd && min_water_height == 0) {
-    runoff_hd <- max((water_hd - saturation_hd - drain_hd - runoff) * sat_drain_factor, 0)
+  if ((total_water_hd - drain_hd - surface_runoff) > saturation_hd && min_water_height == 0) {
+    runoff_hd <- max((total_water_hd - saturation_hd - drain_hd - runoff) * sat_drain_factor, 0)
   }
 
-  runoff <- runoff + runoff_hd
+  runoff_hd
 }
 
 calculate_potential_et <- function(t_min, t_max, srad, albedo, et_LAI, chlorophyll_albedo = 0.23, KET = 0.5) {
@@ -179,7 +219,12 @@ calculate_potential_et <- function(t_min, t_max, srad, albedo, et_LAI, chlorophy
   equilibrium_evaporation * et_mod
 }
 
-calculate_potential_soil_evaporation <- function(potential_et, et_LAI, minimum_evaporation = 1) {
+calculate_soil_evaporation <- function(potential_et,
+                                       days_since_wetting,
+                                       fraction_transpirable_water,
+                                       current_usable_water_top,
+                                       et_LAI, minimum_evaporation = 1.5) {
+  stopifnot(length(potential_et) == length(days_since_wetting))
   KET <- 0.5
   potential_evaporation <- potential_et * exp(-KET * et_LAI)
   # even with full crop cover there is a minimum evaporation from soil happening
@@ -189,17 +234,24 @@ calculate_potential_soil_evaporation <- function(potential_et, et_LAI, minimum_e
     potential_evaporation
   )
 
-  if(days_since_last_tl_wetting > 1 | )
+  # enter stage I when soil not completely wet
+  ifelse(
+    days_since_wetting > 1 |
+      fraction_transpirable_water < 0.5 |
+      current_usable_water_top <= 1,
+    potential_evaporation * ((days_since_wetting + 1)^0.5 - days_since_wetting^0.5),
+    potential_evaporation
+  )
 }
 
 calculate_days_since_wetting <- function(rain_mm, irrigation_mm, WET_MM = 10) {
   ifelse(rain_mm + irrigation_mm > WET_MM, 1, 0) %>%
-          rle() %>%
-          {
-            purrr::map2(
-              .$values, .$lengths,
-              ~ dplyr::case_when(.x == 1 ~ rep(1, .y), .x == 0 ~ (1:.y) + 1)
-            )
-          } %>%
-          unlist()
+    rle() %>%
+    {
+      purrr::map2(
+        .$values, .$lengths,
+        ~ dplyr::case_when(.x == 1 ~ rep(1, .y), .x == 0 ~ (1:.y) + 1)
+      )
+    } %>%
+    unlist()
 }

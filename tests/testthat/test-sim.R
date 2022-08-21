@@ -21,3 +21,4 @@ test_that("sowing window inter-year is correct", {
   expect_equal(window$DOY[[1]], sowing_doy)
   expect_equal(window$DOY[[duration]], (sowing_doy + (duration - 1)) - 366)
 })
+
