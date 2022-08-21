@@ -106,6 +106,7 @@ calculate_fallow_water <- function(sim_env, hydration_depth = 600, MAI = 0.9, ro
     current_hd <- initial_usable_water_hd
     drain_top <- drain_hd <- double(days)
     transpiration <- transpiration_top <- 0
+    evaporation <- double(days)
 
     for (day in seq_len(days)) {
       total_top <- lower_limit_top + current_top
@@ -117,11 +118,11 @@ calculate_fallow_water <- function(sim_env, hydration_depth = 600, MAI = 0.9, ro
       irrigation <- data$irrigation_mm[[day]]
       s_runoff <- surface_runoff(current_hd, rain, )
       runoff <- s_runoff + depth_runoff(total_hd, drain_hd[[day]], s_runoff)
-      evaporation <- calculate_soil_evaporation(
+      evaporation[[day]] <- calculate_soil_evaporation(
         data$potential_et[[day]], data$days_since_wetting[[day]],
         0, current_top, 0, 0
       )
-      fixed_change <- rain + irrigation - runoff - evaporation
+      fixed_change <- rain + irrigation - runoff - evaporation[[day]]
 
       current_top <- current_top - drain_top[[day]] - transpiration_top + fixed_change
       current_top <- max(current_top, 0)
@@ -134,6 +135,15 @@ calculate_fallow_water <- function(sim_env, hydration_depth = 600, MAI = 0.9, ro
       fraction_usable_water_hd[[day]] <- current_hd / maximum_usable_water_hd
       total_water_hd[[day]] <- lower_limit_hd + current_hd
     }
+
+    data <- data %>% mutate(
+      current_usable_water_top,
+      fraction_usable_water_top,
+      total_water_top,
+      current_usable_water_hd,
+      fraction_usable_water_hd,
+      total_water_hd
+    )
   })
 
   # maximum_transpirable_water = root_depth * soil$extractable_water,
@@ -172,7 +182,7 @@ surface_runoff <- function(current_usable_water_hd, rain_mm,
   if (!rain_fed) {
     return(0)
   }
-  if(missing(et_LAI)) et_LAI <- 0
+  if (missing(et_LAI)) et_LAI <- 0
   KET <- 0.5
   runoff <- 0
   # Surface runoff. Only for rain fed -> assumption irrigation is well managed so no "waste"
