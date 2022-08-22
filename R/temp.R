@@ -22,7 +22,7 @@ calculate_daily_temp_unit <- function(average_temp,
     average_temp <= temp_min | average_temp >= temp_max ~ 0,
     average_temp > temp_min & average_temp < ideal_temp_min ~ (average_temp - temp_min) / (ideal_temp_min - temp_min),
     average_temp > ideal_temp_max & average_temp < temp_max ~ (temp_max - average_temp) / (temp_max - ideal_temp_max),
-    average_temp >= ideal_temp_min | average_temp <= ideal_temp_max ~ 1
+    average_temp >= ideal_temp_min & average_temp <= ideal_temp_max ~ 1
   )
 
   (ideal_temp_min - temp_min) * temp_factor
@@ -32,4 +32,13 @@ add_daily_temp_unit <- function (env){
   with(env, {
     data <- data %>% mutate()
   })
+}
+
+calculate_rue_factor <- function(average_temp, crop) {
+    dplyr::case_when(
+    average_temp <= crop$TBRUE | average_temp >= crop$TCRUE ~ 0,
+    average_temp > crop$TBRUE & average_temp < crop$TP1RUE ~ (average_temp - crop$TBRUE) / (crop$TP1RUE - crop$TBRUE),
+    average_temp > crop$TP2RUE & average_temp < crop$TCRUE ~ (crop$TCRUE - average_temp) / (crop$TCRUE - crop$TP2RUE),
+    average_temp >= crop$TP1RUE & average_temp <= crop$TP2RUE ~ 1
+  )
 }

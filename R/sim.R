@@ -114,24 +114,6 @@ scenario <- list(
   )
 )
 
-main_loop <- function(scenarios) {
-  for (scenario in scenarios) {
-    for (year in seq_len(scenario$management$sim_n_years)) {
-      if (start_doy == sowing_doy) start_doy <- start_doy - 1
-      MAT <- iniPheno <- iniLAI <- iniSW <- SNOW <- 0
-
-      find_sow_date()
-      while (MAT != 1) {
-        update_weather()
-        phenology(iniPheneo)
-        crop_LAI()
-      }
-    }
-  }
-}
-
-
-
 #' Get sowing window
 #'
 #' @param year Year sowing window starts in.
@@ -166,7 +148,7 @@ find_sow_date <- function(data,
                           sowing_window_duration,
                           sowing_temp,
                           sowing_water,
-                          find_sowing_date = 1) {
+                          find_sowing_date = 0) {
   # instead of having a long if else chain use function objects with fixed api
   # find simulation start day
   # -- just use dplyr instead of looping through everything
@@ -174,6 +156,14 @@ find_sow_date <- function(data,
 
   # get from input
   dur <- 5 # consecutive days conditions have to be fulfilled for
+  
+  # if fixed day nothing to do
+  if (find_sowing_date == 0) {
+    sowing_data <- data %>%
+      filter(year == start_year & doy == sowing_doy) %>%
+      mutate(sowing_day = TRUE)
+    return(sowing_data)
+  }
 
   # sowing_temp <- 15
   # sowing_doy <- 100
@@ -187,60 +177,53 @@ find_sow_date <- function(data,
       rain_sum = n_day_sum(dur, rain_mm)
     )
 
-  # if fixed day nothing to do
-  if (find_sowing_date == 1) {
-    sowing_data <- data %>%
-      filter(year == start_year & doy == sowing_doy) %>%
-      mutate(sowing_day = TRUE)
-  }
-
-  if (find_sowing_date %in% c(2, 3, 4)) {
-    if (find_sowing_date == 2) {
+  if (find_sowing_date %in% c(1, 2, 3)) {
+    if (find_sowing_date == 1) {
       # find a 5 day rain free period starting from sowing_doy in start_year
       sowing_data <- sowing_data %>%
         mutate(sowing_day = rain_sum == 0)
     }
 
-    if (find_sowing_date == 3) {
+    if (find_sowing_date == 2) {
       # find a 5 day rain free period starting from sowing_doy in start_year
       # and average temp in 5 day period > sowing_temp
       sowing_data <- sowing_data %>% mutate(sowing_day = rain_sum == 0 & sliding_average_temp > sowing_temp)
     }
     # TODO this excludes days where sliding_average_temp = sowing_temp
-    if (find_sowing_date == 4) {
+    if (find_sowing_date == 3) {
       # find a 5 day rain free period starting from sowing_doy in start_year
       # and average temp in 5 day period < sowing_temp
       sowing_data <- sowing_data %>% mutate(sowing_day = rain_sum == 0 & sliding_average_temp < sowing_temp)
     }
   }
 
-  if (find_sowing_date == 5) {
+  if (find_sowing_date == 4) {
     # sow when FTSW1 >= sow_water
     # do run soil_water()/ water should be >= 1
     sowing_data <- sowing_data %>% mutate(sowing_day = fraction_usable_water_top >= sowing_water)
   }
 
-  if (find_sowing_date == 6) {
+  if (find_sowing_date == 5) {
     # sow when FTSW1 <= sow_water
     # do run soil_water()/ water should be >= 1
     sowing_data <- sowing_data %>% mutate(sowing_day = fraction_usable_water_top <= sowing_water)
   }
 
-  if (find_sowing_date == 7) {
+  if (find_sowing_date == 6) {
     # sow when cumsum rainfall > sow_water
     sowing_data <- sowing_data %>% mutate(
       sowing_day = rain_sum > sowing_water
     )
   }
 
-  if (find_sowing_date == 8) {
+  if (find_sowing_date == 7) {
     # sow when cumsum rainfall > sow_water and sliding_average_temp < sow_temp
     sowing_data <- sowing_data %>% mutate(
       sowing_day = rain_sum > sowing_water & sliding_average_temp < sowing_temp
     )
   }
 
-  if (find_sowing_date == 9) {
+  if (find_sowing_date == 91) {
     forcreq <- 100
     temp_min <- 10
     # trees always start at 1.1.

@@ -6,3 +6,6 @@
 ## usethis namespace: start
 ## usethis namespace: end
 NULL
+#Currente limitations
+# No forages/trees
+# Only sims one season at a time.

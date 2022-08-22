@@ -68,3 +68,10 @@ ensure_var <- function(env, var, value, force = FALSE) {
     assign(var, value, envir = env)
   }
 }
+
+`%||%` <- function (x, y)
+{
+    if (purrr::is_null(x))
+        y
+    else x
+}
