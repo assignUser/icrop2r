@@ -4,12 +4,12 @@
 \name{iCrop2R-package}
 \alias{iCrop2R}
 \alias{iCrop2R-package}
-\title{iCrop2R: What the Package Does (One Line, Title Case)}
+\title{iCrop2R: Implementation Of The SSM-iCrop2 Crop Modell}
 \description{
-What the package does (one paragraph).
+An R implementation of the SSM-iCrop2 crop model.
 }
 \author{
-\strong{Maintainer}: First Last \email{first.last@example.com} (\href{https://orcid.org/YOUR-ORCID-ID}{ORCID})
+\strong{Maintainer}: Jacob Wujciak \email{jacob@wujciak.de} (\href{https://orcid.org/0000-0002-7281-3989}{ORCID})
 
 }
 \keyword{internal}

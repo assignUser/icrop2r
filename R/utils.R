@@ -1,17 +1,7 @@
-#' Calculate solar radiation from sunshine hours
-#'
-#' @param lat Latitude in degrees. South latitudes should be entered
-#'   as negative.
-#' @param
-#' @return
-#' @details
-#' @examples
-#' @exported
-#' @md
-srad_from_sunh <- function() {
-
+pf <- function(...) {
+  parent.frame(...)
 }
-pf <- parent.frame
+
 create_sim_env <- function(crop, soil, weather, management = NULL, .env = parent.frame()) {
   stopifnot(is.list(crop), is.list(soil), is.data.frame(weather))
   sim_env <- list2env(crop, parent = .env)
@@ -69,9 +59,14 @@ ensure_var <- function(env, var, value, force = FALSE) {
   }
 }
 
-`%||%` <- function (x, y)
-{
-    if (purrr::is_null(x))
-        y
-    else x
+`%||%` <- function(x, y) {
+  if (purrr::is_null(x)) {
+    y
+  } else {
+    x
+  }
+}
+
+n_day_sum <- function(n, values) {
+  sapply(1:n - 1, function(x) lag(values, x)) %>% rowSums()
 }

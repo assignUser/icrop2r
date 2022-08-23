@@ -1,119 +1,3 @@
-scenario <- list(
-  name = character(),
-  location = list(
-    name = character(),
-    latitude = double(),
-    vapour_pressure_deficit_coefficent = 0.75,
-    weather = list(
-      year = 1984,
-      day_of_year = 1,
-      solar_radiation = double(), # in MJ/m^2/day
-      temp_max = double(), # celsius obv.
-      temp_min = double(),
-      rain_mm = double()
-    ),
-    temp_mod = 0,
-    rain__mod = 1,
-    co2_ppm = 385
-  ),
-  management = list(
-    name = character(),
-    find_sowing_date = factor(1:9,
-      labels = c(
-        "Fixed sowing date",
-        "Sow in the 5th day of a 5-day rainfree period",
-        "Sow in the 5th day  of a 5-day rainfree period + average temp > sow_temp.",
-        "Sow in the 5th day  of a 5-day rainfree period + average temp < sow_temp.",
-        "Sow when FTSW1 > SowWat.",
-        "Sow when FTSW1 < SowWat.",
-        "Sow when cumulative rainfall over a 5-day period > SowWat.",
-        "Sow when cumulative rainfall over a 5-day period > SowWat and average temp < sow_temp.",
-        "Prediction of bud burst in tree crops."
-      )
-    ),
-    start_year = integer(),
-    sim_n_years = integer(),
-    start_doy = integer(),
-    sowing_doy = integer(), # fixed sowing date or start of sowing window
-    sowing_window_duration = integer(), # days
-    rain_free_preiod = 5, # fixed don't change ?
-    sowing_temp = integer(),
-    sow_water = double(), # fraction transporable soil water
-    water = factor(0:3, labels = c(
-      "potential prodution",
-      "automated irrigation",
-      "rain feed",
-      "fixed irrigation"
-    )),
-    irrigation_level = 0.5,
-    top_soil_MAI = 0.9, # moisture availability index
-    soil_MAI = 0.9,
-    latest_harvest_doy = integer(),
-    forages_clipping_n = integer(),
-    min_water_mm_rice = integer(),
-    max_water_mm_rice = integer()
-  ),
-  soil = list(
-    name = character(),
-    soil_depth = integer(), # mm
-    depth_top_layer = integer(), # mm
-    soil_albedo = double(),
-    curve_number = integer(), # https://en.wikipedia.org/wiki/Runoff_curve_number
-    drainage_factor = double(),
-    drained_upper_limit = double(), # mm mm^-1 volumetric soil water content at dul
-    extractable_water = double(), # mm mm^-1  Volumetric soil water content available for extraction by crop roots
-    liquid_limit = double(), # https://en.wikipedia.org/wiki/Atterberg_limits
-    surface_drainage_factor = 0.5, # surface run off?
-    slope = 10, # ?
-    ec = NULL # ?
-  ),
-  crop = list(
-    tbd = integer(), # Base temp for development
-    tp1d = integer(), # Lower optimum temperature for development
-    tp2d = integer(), # Upper optimum temperature for development
-    tcd = integer(), # Ceiling temperature for development
-    forcereg = integer(), # TODO
-    tuhar = integer(),
-    fremr = double(),
-    frbsg = double(),
-    frtsg = double(),
-    frpm = double(),
-    x1 = double(),
-    y1 = double(),
-    x2 = double(),
-    y2 = double(),
-    laimx = double(),
-    frbls = double(),
-    srate = integer(),
-    frzth = integer(), # oC
-    frzldr = double(), # m2/m2/oC
-    heatth = integer(), # oC
-    HeatTH = double(),
-    HtLDR = double(),
-    TBRUE = double(),
-    TP1RUE = double(),
-    TP2RUE = double(),
-    TCRUE = double(),
-    KPAR = double(),
-    IRUE = double(),
-    "C3/C4" = double(),
-    HImax = double(),
-    FRTRL = double(),
-    GCC = double(),
-    frBRG = double(),
-    frTRG = double(),
-    iDEPORT = double(),
-    MEED = double(),
-    TEC = double(),
-    WSSG = double(),
-    WSSL = double(),
-    WSSD = double(),
-    "MC%" = double(),
-    SaltTH = double(),
-    SaltSlope = double()
-  )
-)
-
 #' Get sowing window
 #'
 #' @param year Year sowing window starts in.
@@ -127,10 +11,6 @@ get_sowing_window <- function(year, sowing_doy, duration) {
   window <- start_date:end_date %>% lubridate::as_date()
 
   dplyr::tibble(year = lubridate::year(window), doy = lubridate::yday(window))
-}
-
-n_day_sum <- function(n, values) {
-  sapply(1:n - 1, function(x) lag(values, x)) %>% rowSums()
 }
 
 nth_rain_free <- function(weather, n) {
@@ -252,19 +132,14 @@ find_sow_date <- function(data,
 #' @param temp_mod Additive modifier for temperature.
 #' @param rain_mod Multiplicative modifier for precipitation.
 #' @return Updated weather data.
-#' @export
 prepare_weather <- function(weather, crop, albedo, rain_mod = 1, temp_mod = 0) {
     calc_snow <- function(snow_mm, rain_mm, t_max) {
       if (t_max <= 1) {
         snow_mm <- snow_mm + rain_mm
-      }
-      return(snow_mm)
-    }
-
-    calc_snow_melt <- function(snow_mm, snow_melt, t_max) {
-      if (t_max >= 1) {
+      } else {
+        snow_melt <- t_max + rain_mm * 0.4
         snow_melt <- min(snow_melt, snow_mm)
-        snow_mm <- max(snow_mm - snow_melt, 0)
+        snow_mm <- snow_mm - snow_melt
       }
       return(snow_mm)
     }
@@ -284,35 +159,16 @@ prepare_weather <- function(weather, crop, albedo, rain_mod = 1, temp_mod = 0) {
         snow_mm = purrr::accumulate2(rain_mm, t_max, calc_snow, .init = 0) %>%
           unlist() %>%
           tail(-1),
-        snow_melt = ifelse(t_max > 1, pmin(t_max + rain_mm * 0.4, snow_mm), 0),
+       snow_melt = snow_mm - lead(snow_mm, default = 0),
       ) %>%
       mutate(
         rain_mm = ifelse(t_max <= 1, 0, rain_mm + snow_melt),
-        snow_mm = ifelse(t_max > 1,
-          snow_mm - snow_melt, # TODO test not negative
-          snow_mm
-        ),
+        # snow_mm = ifelse(t_max > 1,
+        #   snow_mm - snow_melt, # TODO test not negative
+        #   snow_mm
+        # ),
         irrigation_mm = 0,
         days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm),
         potential_et = calculate_potential_et(t_min, t_max, srad, albedo, 0)
       )
 }
-
-# use with fresh sim_env to pre-calc all values possible & necessary to find sow date
-calculate_fallow_data <- function(sim_env) {
-  prepare_weather(sim_env)
-  calculate_fallow_water(sim_env)
-  invisible(sim_env)
-}
-
-# Ablauf
-# load weather
-# load crops
-# load/gen soil
-# calc_fallow
-# find_sowing_date
-# simulation
-#   phenology
-#   lai
-#   dry matter
-#   water -> no water, rain fed, irrigated (auto/fixed)

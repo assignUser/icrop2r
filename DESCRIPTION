@@ -1,20 +1,19 @@
 Package: iCrop2R
-Title: What the Package Does (One Line, Title Case)
+Title: Implementation Of The SSM-iCrop2 Crop Modell 
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
+    person("Jacob", "Wujciak", , "jacob@wujciak.de", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-7281-3989"))
+Description: An R implementation of the SSM-iCrop2 crop model.
 License: MIT + file LICENSE
 Depends: 
-    R (>= 2.10)
+    R (>= 3.4)
 Imports: 
     dplyr,
     lubridate,
     purrr,
-    R6,
-    rlang,
-    withr
+    R6 (>= 2.4),
+    utils
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

@@ -27,6 +27,7 @@ kf2CN <- function(kf) {
 #'   more clay = smaller df (~0.2 for predominantly clay), more sand = larger df (~0.75
 #'   for predom. sand). See Sinclair & Soltani (2012) p. 177, table 14.2
 #' @param we Effektive Wurzelungstiefe in cm.
+#' @export
 german_soil <- function(name, GPV, LK, nFK, kf, we,
                         depth_top_layer = 200,
                         albedo = 0.1,
@@ -57,97 +58,12 @@ german_soil <- function(name, GPV, LK, nFK, kf, we,
   )
 }
 
-soil_water <- function(sim_env) { # NO
-  with(sim_env, {
-    data <- data %>% mutate(
-      irrigation_mm = 0, # TODO make conditional/setup structure in the beginning
-      et_LAI = 0, # TODO make conditional/setup structure in the beginning
-      days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm),
-      potential_et = calculate_potential_et(t_min, t_max, srad, albedo, et_LAI),
-      # TODO water
-      soil_evaporation = calculate_soil_evaporation(
-        potential_et,
-        days_since_wetting,
-        fraction_transpirable_water, current_usable_water_top,
-        et_LAI
-      )
-    )
-  })
-}
-
-
 drain <- function(current, maximum, drain_factor = get("drain_factor", pf())) {
   ifelse(current > maximum,
     (current - maximum) * drain_factor,
     0
   )
   # water_below_roots <- max(water_below_roots + drain_transpirable - root_growth_water(), 0)
-}
-
-
-calculate_fallow_water <- function(sim_env, hydration_depth = 600, MAI = 0.9, root_depth = 0) {
-  ensure_var(sim_env, "hydration_depth", hydration_depth)
-  ensure_var(sim_env, "MAI", MAI)
-
-  with(sim_env, {
-    # data <- data %>% mutate(
-    #   current_usable_water_top = initial_usable_water_top,
-    #   current_usable_water_hd = initial_usable_water_hd,
-    #   total_water_hd = initial_water_hd,
-    #   current_water_below_roots = initial_water_below_roots,
-    #   current_transpirable_water = 0,
-    #   irrigation_mm = 0
-    # )
-    days <- nrow(data)
-    current_usable_water_top <- current_usable_water_hd <- double(days)
-    fraction_usable_water_top <- fraction_usable_water_hd <- double(days)
-    total_water_top <- total_water_hd <- double(days)
-    current_top <- initial_usable_water_top
-    current_hd <- initial_usable_water_hd
-    drain_top <- drain_hd <- double(days)
-    transpiration <- transpiration_top <- 0
-    evaporation <- double(days)
-
-    for (day in seq_len(days)) {
-      total_top <- lower_limit_top + current_top
-      total_hd <- lower_limit_hd + current_hd
-      drain_top[[day]] <- drain(current_top, maximum_usable_water_top)
-      drain_hd[[day]] <- drain(current_hd, maximum_usable_water_hd)
-      # drain_transp
-      rain <- data$rain_mm[[day]]
-      irrigation <- data$irrigation_mm[[day]]
-      s_runoff <- surface_runoff(current_hd, rain, )
-      runoff <- s_runoff + depth_runoff(total_hd, drain_hd[[day]], s_runoff)
-      evaporation[[day]] <- calculate_soil_evaporation(
-        data$potential_et[[day]], data$days_since_wetting[[day]],
-        0, current_top, 0, 0
-      )
-      fixed_change <- rain + irrigation - runoff - evaporation[[day]]
-
-      current_top <- current_top - drain_top[[day]] - transpiration_top + fixed_change
-      current_top <- max(current_top, 0)
-      current_usable_water_top[[day]] <- current_top
-      fraction_usable_water_top[[day]] <- current_top / maximum_usable_water_top
-      total_water_top[[day]] <- lower_limit_top + current_top
-
-      current_hd <- current_hd - drain_hd[[day]] - transpiration + fixed_change
-      current_hd <- max(current_hd, 0)
-      fraction_usable_water_hd[[day]] <- current_hd / maximum_usable_water_hd
-      total_water_hd[[day]] <- lower_limit_hd + current_hd
-    }
-
-    data <- data %>% mutate(
-      current_usable_water_top,
-      fraction_usable_water_top,
-      total_water_top,
-      current_usable_water_hd,
-      fraction_usable_water_hd,
-      total_water_hd
-    )
-  })
-
-  # maximum_transpirable_water = root_depth * soil$extractable_water,
-  # current_transpirable_water = root_depth * soil$extractable_water
 }
 
 root_growth_water <- function(daily_temp_unit, # TODO
@@ -209,7 +125,7 @@ depth_runoff <- function(total_water_hd, drain_hd, surface_runoff = 0, saturatio
   # From saturated soil under rain fed and irrigated land (excl. rice)
   runoff_hd <- 0
   if ((total_water_hd - drain_hd - surface_runoff) > saturation_hd && min_water_height == 0) {
-    runoff_hd <- max((total_water_hd - saturation_hd - drain_hd - runoff) * sat_drain_factor, 0)
+    runoff_hd <- max((total_water_hd - saturation_hd - drain_hd - surface_runoff) * sat_drain_factor, 0)
   }
 
   runoff_hd

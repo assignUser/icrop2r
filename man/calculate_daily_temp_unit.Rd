@@ -23,6 +23,9 @@ calculate_daily_temp_unit(
 
 \item{ideal_temp_max}{Upper bound of ideal growing window.}
 }
+\value{
+Daily temperature unit.
+}
 \description{
 The daily temperature unit is used to modify growth speed and efficiency.
 All temperature are in Celsius.

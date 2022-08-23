@@ -7,6 +7,7 @@
 #' @param temp_max Maximum viable growing temperature.
 #' @param ideal_temp_min Lower bound of ideal growing window.
 #' @param ideal_temp_max Upper bound of ideal growing window.
+#' @return Daily temperature unit.
 calculate_daily_temp_unit <- function(average_temp,
                                    temp_min, temp_max,
                                    ideal_temp_min, ideal_temp_max) {
@@ -26,12 +27,6 @@ calculate_daily_temp_unit <- function(average_temp,
   )
 
   (ideal_temp_min - temp_min) * temp_factor
-}
-
-add_daily_temp_unit <- function (env){
-  with(env, {
-    data <- data %>% mutate()
-  })
 }
 
 calculate_rue_factor <- function(average_temp, crop) {
