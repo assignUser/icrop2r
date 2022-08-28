@@ -41,6 +41,11 @@ german_soil <- function(name, GPV, LK, nFK, kf, we,
     drain_factor <- round(cn * -0.0291 + 2.6139, 2)
   }
   stopifnot(GPV >= LK + nFK, is.character(name))
+  # mm/dm -> mm/mm
+  GPV <- GPV / 100
+  LK <- LK / 100
+  nFK <- nFK / 100
+
   list(
     name = name,
     soil_depth = we * 10, # maximum depth for roots to grow to in mm
@@ -58,7 +63,7 @@ german_soil <- function(name, GPV, LK, nFK, kf, we,
   )
 }
 
-drain <- function(current, maximum, drain_factor = get("drain_factor", pf())) {
+drain <- function(current, maximum, drain_factor) {
   ifelse(current > maximum,
     (current - maximum) * drain_factor,
     0
@@ -118,14 +123,14 @@ surface_runoff <- function(current_usable_water_hd, rain_mm,
   runoff
 }
 
-depth_runoff <- function(total_water_hd, drain_hd, surface_runoff = 0, saturation_hd = get("saturation_hd", pf()),
-                         min_water_height = 0, sat_drain_factor = get("sat_drain_factor", pf()),
-                         slope = get("slope", pf()),
+depth_runoff <- function(total_water_hd, drain_hd, surface_runoff = 0, sat_hd = saturation_hd,
+                         min_water_height = 0, sat_drain_f = sat_drain_factor,
+                         slpe = slope,
                          KET = 0.5) {
   # From saturated soil under rain fed and irrigated land (excl. rice)
   runoff_hd <- 0
-  if ((total_water_hd - drain_hd - surface_runoff) > saturation_hd && min_water_height == 0) {
-    runoff_hd <- max((total_water_hd - saturation_hd - drain_hd - surface_runoff) * sat_drain_factor, 0)
+  if ((total_water_hd - drain_hd - surface_runoff) > sat_hd && min_water_height == 0) {
+    runoff_hd <- max((total_water_hd - sat_hd - drain_hd - surface_runoff) * sat_drain_f, 0)
   }
 
   runoff_hd

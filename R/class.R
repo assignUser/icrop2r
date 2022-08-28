@@ -1,3 +1,4 @@
+#' @export
 Simulation <- R6Class("Simulation", # nolint
   public = list(
     crop = NULL,
@@ -243,9 +244,9 @@ Simulation <- R6Class("Simulation", # nolint
         et_LAI <- min(et_LAI, ETLAIMN)
 
         # Drain
-        drain_top <- drain(current_top, maximum_usable_water_top)
-        drain_hd <- drain(current_hd, maximum_usable_water_hd)
-        drain_transp <- drain(current_transp, maximum_transp)
+        drain_top <- drain(current_top, maximum_usable_water_top, drain_factor)
+        drain_hd <- drain(current_hd, maximum_usable_water_hd, drain_factor)
+        drain_transp <- drain(current_transp, maximum_transp, drain_factor)
         water_below_roots <- max(water_below_roots + drain_transp - EWAT, 0)
 
         # Automatic Irrigation
@@ -272,7 +273,7 @@ Simulation <- R6Class("Simulation", # nolint
 
         # Runoff
         s_runoff <- surface_runoff(current_hd, day$rain_mm, rain_fed = water == 2)
-        runoff <- s_runoff + depth_runoff(total_hd, drain_hd, s_runoff)
+        runoff <- s_runoff + depth_runoff(total_hd, drain_hd, s_runoff, saturation_hd, 0, sat_drain_factor, slope)
         evaporation <- calculate_soil_evaporation(
           day$potential_et, day$days_since_wetting,
           fraction_transp, current_top, et_LAI

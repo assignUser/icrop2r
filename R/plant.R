@@ -13,8 +13,8 @@ total_transpiration <- function(t_min, t_max, daily_dry_matter,
 top_transpiration <- function(transpiration,
                               root_depth,
                               fraction_usable_water_top,
-                              depth_top_layer = get(depth_top_layer, pf()),
-                              transpiration_threshold = get(WSSG, pf())) {
+                              depth_top_layer,
+                              transpiration_threshold) {
   stopifnot(length(transpiration) == length(fraction_usable_water_top))
   top_share <- ifelse(fraction_usable_water_top > transpiration_threshold,
     1,
