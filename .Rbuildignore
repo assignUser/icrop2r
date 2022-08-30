@@ -1,3 +1,5 @@
 ^LICENSE\.md$
 ^\.lintr$
 ^\.vscode$
+^\.github$
+^README\.Rmd$

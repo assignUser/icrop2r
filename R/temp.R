@@ -29,6 +29,7 @@ calculate_daily_temp_unit <- function(average_temp,
   (ideal_temp_min - temp_min) * temp_factor
 }
 
+
 calculate_rue_factor <- function(average_temp, crop) {
     dplyr::case_when(
     average_temp <= crop$TBRUE | average_temp >= crop$TCRUE ~ 0,

@@ -36,7 +36,9 @@ Simulation <- R6Class("Simulation", # nolint
     run_simulation = function() {
       private$state <- private$get_initial_state()
       state <- private$state
-      self$result <- private$data %>%
+      self$result <- private$data %>% mutate(
+        RUE_factor = calculate_rue_factor(average_temp, self$crop)
+      ) %>%
         filter(year == private$sowing_day$year &
           doy >= private$sowing_day$doy &
           doy <= self$management$StopDoy) %>%
@@ -198,7 +200,7 @@ Simulation <- R6Class("Simulation", # nolint
     },
     dry_matter_step = function(state) {
       with(state, {
-        RUE <- IRUE * calculate_rue_factor(day$average_temp, self$crop) * WSFG
+        RUE <- IRUE * day$RUE_factor * WSFG
         if (NDS < frEMR || NDS > frPM) RUE <- 0
 
         FINT <- 1 - exp(-KPAR * LAI)
@@ -257,7 +259,7 @@ Simulation <- R6Class("Simulation", # nolint
         }
         day$irrigation_mm <- IRGW
         # TODO Irrigation by fixed days
-        
+
         # EWAT - Water exploitation by root growth
         GRTD <- GRTDP * day$daily_temp_unit
         if (NDS < frBRG ||
@@ -272,16 +274,43 @@ Simulation <- R6Class("Simulation", # nolint
         EWAT <- min(GRTD * extractable_water, water_below_roots)
 
         # Runoff
-        s_runoff <- surface_runoff(current_hd, day$rain_mm, rain_fed = water == 2)
-        runoff <- s_runoff + depth_runoff(total_hd, drain_hd, s_runoff, saturation_hd, 0, sat_drain_factor, slope)
+        s_runoff <- surface_runoff(current_hd,
+          day$rain_mm,
+          CN,
+          maximum_usable_water_hd,
+          et_LAI,
+          slope,
+          rain_fed = water == 2
+        )
+        runoff <- s_runoff + depth_runoff(
+          total_hd,
+          drain_hd,
+          s_runoff,
+          saturation_hd,
+          0, # no rice simulation
+          sat_drain_factor,
+          slope
+        )
         evaporation <- calculate_soil_evaporation(
           day$potential_et, day$days_since_wetting,
           fraction_transp, current_top, et_LAI
         )
 
         # Transpiration
-        transpiration <- total_transpiration(day$t_min, day$t_max, DDMP, VPDF, transpiration_efficiency)
-        transpiration_top <- top_transpiration(transpiration, DEPORT, fraction_top, depth_top_layer, WSSG)
+        transpiration <- total_transpiration(
+          day$t_min,
+          day$t_max,
+          DDMP,
+          VPDF,
+          transpiration_efficiency
+        )
+        transpiration_top <- top_transpiration(
+          transpiration,
+          DEPORT,
+          fraction_top,
+          depth_top_layer,
+          WSSG
+        )
 
         # Updating
         fixed_change <- day$rain_mm + day$irrigation_mm - runoff - evaporation
@@ -372,22 +401,22 @@ Simulation <- R6Class("Simulation", # nolint
       private$set_consts()
       fallow_state <- private$get_initial_state()
 
-        private$fallow_data <- private$data %>%
-          dplyr::rowwise() %>%
-          dplyr::group_map(.f = function(day, key) {
-            fallow_state$day <- day
-            private$water_step(fallow_state)
-            with(fallow_state, data.frame(
-              current_usable_water_top = current_top,
-              fraction_usable_water_top = current_hd,
-              total_water_top = total_top,
-              current_usable_water_hd = current_hd,
-              fraction_usable_water_hd = fraction_hd,
-              total_water_hd = total_hd
-            ))
-          }) %>%
-          dplyr::bind_rows() %>%
-          dplyr::bind_cols(private$data, .)
+      private$fallow_data <- private$data %>%
+        dplyr::rowwise() %>%
+        dplyr::group_map(.f = function(day, key) {
+          fallow_state$day <- day
+          private$water_step(fallow_state)
+          with(fallow_state, data.frame(
+            current_usable_water_top = current_top,
+            fraction_usable_water_top = current_hd,
+            total_water_top = total_top,
+            current_usable_water_hd = current_hd,
+            fraction_usable_water_hd = fraction_hd,
+            total_water_hd = total_hd
+          ))
+        }) %>%
+        dplyr::bind_rows() %>%
+        dplyr::bind_cols(private$data, .)
 
       start_doy <- self$management$Fpdoy %||% self$management$SimDoy
       private$sowing_day <- find_sow_date(

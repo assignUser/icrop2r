@@ -71,7 +71,7 @@ drain <- function(current, maximum, drain_factor) {
   # water_below_roots <- max(water_below_roots + drain_transpirable - root_growth_water(), 0)
 }
 
-root_growth_water <- function(daily_temp_unit, # TODO
+root_growth_water <- function(daily_temp_unit,
                               potential_root_growth = crop$GRTDP,
                               frBRG = crop$frBRG,
                               frTRG = crop$frTRG,
@@ -95,11 +95,12 @@ root_growth_water <- function(daily_temp_unit, # TODO
   root_water <- max(actual_root_growth * extractable_water, water_below_roots)
 }
 
-surface_runoff <- function(current_usable_water_hd, rain_mm,
-                           CN = get("CN", pf()),
-                           maximum_usable_water_hd = get("maximum_usable_water_hd", pf()),
-                           et_LAI = get("et_LAI", pf()),
-                           slope = get("slope", pf()), rain_fed = TRUE) {
+surface_runoff <- function(current_usable_water_hd,
+                           rain_mm,
+                           CN,
+                           maximum_usable_water_hd,
+                           et_LAI,
+                           slope = 10, rain_fed = TRUE) {
   if (!rain_fed) {
     return(0)
   }
