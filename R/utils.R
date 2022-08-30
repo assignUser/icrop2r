@@ -32,7 +32,6 @@ create_sim_env <- function(crop, soil, weather, management = NULL, .env = parent
     RUE_385 <- rue(385, c3c4)
     RUE_CO2 <- rue(co2, c3c4)
     CO2RUE <- RUE_CO2 / RUE_385
-    # TODO var naming scheme CONSTs
     transpiration_efficiency <- TEC * CO2RUE
     # Phenology
     DAP <- NDS <- CTU <- DAYT <- SRAINT <- STMINT <-
@@ -47,7 +46,6 @@ create_sim_env <- function(crop, soil, weather, management = NULL, .env = parent
     PART2 <- log((1 / y2 - 1) / (1 / x2))
     BL <- (PART2 - PART1) / (x1 - x2)
     AL <- PART1 + BL * x1
-    # TODO create CONSTs and setup dataframe with all cols
   })
 
   sim_env

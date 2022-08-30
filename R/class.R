@@ -389,7 +389,7 @@ Simulation <- R6Class("Simulation", # nolint
           dplyr::bind_rows() %>%
           dplyr::bind_cols(private$data, .)
 
-      start_doy <- self$management$Fpdoy %||% self$management$SimDoy # TODO improve input names -> via function?
+      start_doy <- self$management$Fpdoy %||% self$management$SimDoy
       private$sowing_day <- find_sow_date(
         private$fallow_data,
         start_doy,
@@ -397,7 +397,8 @@ Simulation <- R6Class("Simulation", # nolint
         self$management$SearchDur,
         self$management$SowTemp,
         self$management$SowWat,
-        self$management$FixFind
+        self$management$FixFind,
+        self$management$RfreeP %||% 5
       )
     }
     # TODO validators

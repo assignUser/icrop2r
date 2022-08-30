@@ -107,7 +107,6 @@ surface_runoff <- function(current_usable_water_hd, rain_mm,
   KET <- 0.5
   runoff <- 0
   # Surface runoff. Only for rain fed -> assumption irrigation is well managed so no "waste"
-  # TODO origin of formulae?
   CN2 <- CN * exp(0.00673 * (100 - CN))
   CNS <- 0.333 * (CN2 - CN) * (1 - 2 * exp(-13.86 * slope)) + CN
   cover <- (1 - exp(-KET * et_LAI)) * 100

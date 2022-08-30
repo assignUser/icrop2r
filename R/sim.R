@@ -28,14 +28,13 @@ find_sow_date <- function(data,
                           sowing_window_duration,
                           sowing_temp,
                           sowing_water,
-                          find_sowing_date = 0) {
+                          find_sowing_date = 0,
+                          rain_free_dur = 5) {
   # instead of having a long if else chain use function objects with fixed api
   # find simulation start day
   # -- just use dplyr instead of looping through everything
   stopifnot(start_year %in% data$year, is.data.frame(data))
 
-  # get from input
-  dur <- 5 # consecutive days conditions have to be fulfilled for
   
   # if fixed day nothing to do
   if (find_sowing_date == 0) {
@@ -45,16 +44,12 @@ find_sow_date <- function(data,
     return(sowing_data)
   }
 
-  # sowing_temp <- 15
-  # sowing_doy <- 100
-  # sowing_window_duration <- 120
-  # start_year <- 1992
   sowing_window <- get_sowing_window(start_year, sowing_doy, sowing_window_duration)
   sowing_data <- data %>%
     filter(year %in% sowing_window$year & doy %in% sowing_window$doy) %>%
     mutate(
-      sliding_average_temp = n_day_sum(5, average_temp) / dur,
-      rain_sum = n_day_sum(dur, rain_mm)
+      sliding_average_temp = n_day_sum(5, average_temp) / rain_free_dur,
+      rain_sum = n_day_sum(rain_free_dur, rain_mm)
     )
 
   if (find_sowing_date %in% c(1, 2, 3)) {
@@ -69,7 +64,7 @@ find_sow_date <- function(data,
       # and average temp in 5 day period > sowing_temp
       sowing_data <- sowing_data %>% mutate(sowing_day = rain_sum == 0 & sliding_average_temp > sowing_temp)
     }
-    # TODO this excludes days where sliding_average_temp = sowing_temp
+
     if (find_sowing_date == 3) {
       # find a 5 day rain free period starting from sowing_doy in start_year
       # and average temp in 5 day period < sowing_temp
@@ -79,7 +74,7 @@ find_sow_date <- function(data,
 
   if (find_sowing_date == 4) {
     # sow when FTSW1 >= sow_water
-    # do run soil_water()/ water should be >= 1
+    # do run soil_water()/ water should be >= 1 TODO validate input
     sowing_data <- sowing_data %>% mutate(sowing_day = fraction_usable_water_top >= sowing_water)
   }
 
@@ -155,7 +150,6 @@ prepare_weather <- function(weather, crop, albedo, rain_mod = 1, temp_mod = 0) {
           crop$TBD, crop$TCD,
           crop$TP1D, crop$TP2D
         ),
-        # TODO where does the formula & 0.4 magic number come from
         snow_mm = purrr::accumulate2(rain_mm, t_max, calc_snow, .init = 0) %>%
           unlist() %>%
           tail(-1),
@@ -163,10 +157,6 @@ prepare_weather <- function(weather, crop, albedo, rain_mod = 1, temp_mod = 0) {
       ) %>%
       mutate(
         rain_mm = ifelse(t_max <= 1, 0, rain_mm + snow_melt),
-        # snow_mm = ifelse(t_max > 1,
-        #   snow_mm - snow_melt, # TODO test not negative
-        #   snow_mm
-        # ),
         irrigation_mm = 0,
         days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm),
         potential_et = calculate_potential_et(t_min, t_max, srad, albedo, 0)
