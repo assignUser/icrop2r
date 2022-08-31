@@ -159,6 +159,7 @@ prepare_weather <- function(weather, crop, albedo, rain_mod = 1, temp_mod = 0) {
         rain_mm = ifelse(t_max <= 1, 0, rain_mm + snow_melt),
         irrigation_mm = 0,
         days_since_wetting = calculate_days_since_wetting(rain_mm, irrigation_mm),
-        potential_et = calculate_potential_et(t_min, t_max, srad, albedo, 0)
+        potential_et = calculate_potential_et(t_min, t_max, srad, albedo, 0),
+        irrigation_mm = NULL
       )
 }

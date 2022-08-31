@@ -68,31 +68,6 @@ drain <- function(current, maximum, drain_factor) {
     (current - maximum) * drain_factor,
     0
   )
-  # water_below_roots <- max(water_below_roots + drain_transpirable - root_growth_water(), 0)
-}
-
-root_growth_water <- function(daily_temp_unit,
-                              potential_root_growth = crop$GRTDP,
-                              frBRG = crop$frBRG,
-                              frTRG = crop$frTRG,
-                              MEED = crop$MEED,
-                              NDS,
-                              dry_matter_production,
-                              root_depth,
-                              extractable_water = extractable_water,
-                              soil_depth = soil_depth,
-                              water_below_roots = water$water_below_roots) {
-  actual_root_growth <- potential_root_growth * daily_temp_unit
-  if (NDS < frBRG ||
-    NDS > frTRG ||
-    dry_matter_production == 0 ||
-    root_depth >= soil_depth ||
-    root_depth >= MEED ||
-    water_below_roots == 0) {
-    actual_root_growth <- 0
-  }
-  root_depth <- root_depth + actual_root_growth
-  root_water <- max(actual_root_growth * extractable_water, water_below_roots)
 }
 
 surface_runoff <- function(current_usable_water_hd,
@@ -155,7 +130,7 @@ calculate_soil_evaporation <- function(potential_et,
                                        fraction_transpirable_water,
                                        current_usable_water_top,
                                        et_LAI, minimum_evaporation = 1.5) {
-  stopifnot(length(potential_et) == length(days_since_wetting))
+  #stopifnot(length(potential_et) == length(days_since_wetting))
   KET <- 0.5
   potential_evaporation <- potential_et * exp(-KET * et_LAI)
   # even with full crop cover there is a minimum evaporation from soil happening

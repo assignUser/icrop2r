@@ -27,6 +27,10 @@ Simulation <- R6Class("Simulation", # nolint
         self$soil$albedo,
         self$location$pchng,
         self$location$tchng
+      ) %>% mutate(
+        RUE_factor = calculate_rue_factor(average_temp, self$crop),
+        below_freezing = t_min < self$crop$FrzTh,
+        overheated = t_max > self$crop$HeatTH
       )
     },
     get_data = function() private$data,
@@ -36,27 +40,33 @@ Simulation <- R6Class("Simulation", # nolint
     run_simulation = function() {
       private$state <- private$get_initial_state()
       state <- private$state
-      self$result <- private$data %>% mutate(
-        RUE_factor = calculate_rue_factor(average_temp, self$crop)
-      ) %>%
+      run_water_step <- self$management$water %in% c(1, 2)
+
+      self$result <- private$data %>%
         filter(year == private$sowing_day$year &
           doy >= private$sowing_day$doy &
           doy <= self$management$StopDoy) %>%
         dplyr::rowwise() %>%
         dplyr::group_map(.f = function(day, key) {
-          state$day <- day
-          state$WSFDS <- 1
-          state$WSFL <- 1
+          # dsw can be changed within water step through irrigation
+          dsw <- state$days_since_wetting %||% 1
+          dsw_n <- day$days_since_wetting
+
+          list2env(day, envir = state)
+          if (dsw_n != 1 && dsw_n + 1 != dsw) {
+            state$days_since_wetting <- dsw + 1
+          }
+
           private$phenology_step(state)
           private$LAI_step(state)
           private$dry_matter_step(state)
-          if (self$management$water %in% c(1, 2)) {
+          if (run_water_step) {
             # TODO implement checks on water selection
             private$water_step(state)
           }
-
           with(state, data.frame(
-            irrigation_no = IRGNO,
+            irrigation_no = IRGNO %||% 0,
+            irrigation_mm = IRGW %||% 0,
             current_usable_water_top = current_top,
             fraction_usable_water_top = current_hd,
             total_water_top = total_top,
@@ -142,25 +152,28 @@ Simulation <- R6Class("Simulation", # nolint
         WVEG <- 1
         WTOP <- WVEG + WGRN
         WSFG <- 1
+        WSFDS <- 1
+        WSFL <- 1
       })
 
       state
     },
     phenology_step = function(state) {
       with(state, {
-        # influenced by available water, potentially stops de
+        # influenced by available water,
+        # potentially stops development
         if (NDS > frEMR) {
-          day$daily_temp_unit <- day$daily_temp_unit * WSFDS
+          daily_temp_unit <- daily_temp_unit * WSFDS
         }
 
-        CTU <- CTU + day$daily_temp_unit
+        CTU <- CTU + daily_temp_unit
         # normalized development score
         NDS <- CTU / tuHAR
-        # days already processed?
+        # days already processed
         DAP <- DAP + 1
 
         # Stop if plants are fully grown or maximum time reached
-        if (NDS >= 1 || day$doy == StopDoy) MAT <- 1 # probably unnecessary
+        if (NDS >= 1 || doy == StopDoy) MAT <- 1 # probably unnecessary
       })
     },
     LAI_step = function(state) {
@@ -180,8 +193,8 @@ Simulation <- R6Class("Simulation", # nolint
 
         # frost & heat
         DLAIF <- 0
-        if (NDS > frEMR && day$t_min < FrzTh) {
-          frstf <- abs(day$t_min - FrzTh) * FrzLDR
+        if (below_freezing && NDS > frEMR) {
+          frstf <- abs(t_min - FrzTh) * FrzLDR
           if (frstf < 0) frstf <- 0
           if (frstf > 1) frstf <- 1
           DLAIF <- LAI * frstf
@@ -189,8 +202,8 @@ Simulation <- R6Class("Simulation", # nolint
         DLAI <- max(DLAI, DLAIF)
 
         DLAIH <- DLAI
-        if (NDS > frEMR && day$t_max > HeatTH) {
-          heatf <- max(1 + (day$t_max - HeatTH) * HtLDR, 1)
+        if (overheated && NDS > frEMR) {
+          heatf <- max(1 + (t_max - HeatTH) * HtLDR, 1)
           DLAIH <- DLAI * heatf
         }
         DLAI <- max(DLAI, DLAIH)
@@ -200,12 +213,12 @@ Simulation <- R6Class("Simulation", # nolint
     },
     dry_matter_step = function(state) {
       with(state, {
-        RUE <- IRUE * day$RUE_factor * WSFG
+        RUE <- IRUE * RUE_factor * WSFG
         if (NDS < frEMR || NDS > frPM) RUE <- 0
 
         FINT <- 1 - exp(-KPAR * LAI)
 
-        DDMP <- day$srad * 0.48 * FINT * RUE
+        DDMP <- srad * 0.48 * FINT * RUE
 
         HI <- WGRN / WTOP
         TRANSL <- SGR <- 0
@@ -213,7 +226,7 @@ Simulation <- R6Class("Simulation", # nolint
         if (NDS < frBSG) {
           TRLDM <- WTOP * FRTRL
         } else if (NDS >= frBSG && NDS <= frTSG) {
-          DHI <- PDHI * day$daily_temp_unit
+          DHI <- PDHI * daily_temp_unit
           SGR <- DHI * (WTOP + DDMP) + DDMP * HI
 
           if (HI >= HImax) SGR <- 0
@@ -256,12 +269,15 @@ Simulation <- R6Class("Simulation", # nolint
         if (water == 1 && fraction_transp <= IRGLVL && NDS > 0 && NDS < (0.975 * frPM)) {
           IRGW <- maximum_transp - current_transp
           IRGNO <- IRGNO + 1
+          if (IRGW + rain_mm > wet_mm) {
+            days_since_wetting <- 1
+          }
         }
-        day$irrigation_mm <- IRGW
+        # irrigation_mm <- IRGW
         # TODO Irrigation by fixed days
 
         # EWAT - Water exploitation by root growth
-        GRTD <- GRTDP * day$daily_temp_unit
+        GRTD <- GRTDP * daily_temp_unit
         if (NDS < frBRG ||
           NDS > frTRG ||
           DDMP == 0 ||
@@ -275,7 +291,7 @@ Simulation <- R6Class("Simulation", # nolint
 
         # Runoff
         s_runoff <- surface_runoff(current_hd,
-          day$rain_mm,
+          rain_mm,
           CN,
           maximum_usable_water_hd,
           et_LAI,
@@ -292,14 +308,14 @@ Simulation <- R6Class("Simulation", # nolint
           slope
         )
         evaporation <- calculate_soil_evaporation(
-          day$potential_et, day$days_since_wetting,
+          potential_et, days_since_wetting,
           fraction_transp, current_top, et_LAI
         )
 
         # Transpiration
         transpiration <- total_transpiration(
-          day$t_min,
-          day$t_max,
+          t_min,
+          t_max,
           DDMP,
           VPDF,
           transpiration_efficiency
@@ -313,7 +329,7 @@ Simulation <- R6Class("Simulation", # nolint
         )
 
         # Updating
-        fixed_change <- day$rain_mm + day$irrigation_mm - runoff - evaporation
+        fixed_change <- rain_mm + IRGW - runoff - evaporation
 
         current_top <- current_top - drain_top - transpiration_top + fixed_change
         current_top <- max(current_top, 0)
@@ -360,7 +376,8 @@ Simulation <- R6Class("Simulation", # nolint
           lower_limit_top = lower_limit_top,
           drained_upper_limit_hd = hydration_depth * drained_upper_limit,
           saturation_hd = hydration_depth * saturation,
-          initial_water_hd = lower_limit_hd + initial_usable_water_hd
+          initial_water_hd = lower_limit_hd + initial_usable_water_hd,
+          wet_mm = 10 # mm of water to count as wet surface
         )
       })
 
@@ -400,11 +417,12 @@ Simulation <- R6Class("Simulation", # nolint
     pre_calc_data = function() {
       private$set_consts()
       fallow_state <- private$get_initial_state()
+      fallow_state$water <- 2 #no irrigation on fallow field
 
       private$fallow_data <- private$data %>%
         dplyr::rowwise() %>%
         dplyr::group_map(.f = function(day, key) {
-          fallow_state$day <- day
+          list2env(day, envir = fallow_state)
           private$water_step(fallow_state)
           with(fallow_state, data.frame(
             current_usable_water_top = current_top,
