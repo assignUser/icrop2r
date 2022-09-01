@@ -68,7 +68,7 @@ Simulation <- R6Class("Simulation", # nolint
             irrigation_no = IRGNO %||% 0,
             irrigation_mm = IRGW %||% 0,
             current_usable_water_top = current_top,
-            fraction_usable_water_top = current_hd,
+            fraction_usable_water_top = fraction_top,
             total_water_top = total_top,
             current_usable_water_hd = current_hd,
             fraction_usable_water_hd = fraction_hd,
@@ -426,7 +426,7 @@ Simulation <- R6Class("Simulation", # nolint
           private$water_step(fallow_state)
           with(fallow_state, data.frame(
             current_usable_water_top = current_top,
-            fraction_usable_water_top = current_hd,
+            fraction_usable_water_top = fraction_top,
             total_water_top = total_top,
             current_usable_water_hd = current_hd,
             fraction_usable_water_hd = fraction_hd,
