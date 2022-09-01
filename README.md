@@ -25,7 +25,7 @@ devtools::install_github("assignUser/icrop2r")
 
 The current version does not implement the simulation of trees,
 foragers, rice and only automatic or rainfed irrigation (no potential
-production).
+production) and only simulates one year at a time.
 
 [^1]: A. Soltani, S.M. Alimagham, A. Nehbandani, B. Torabi, E. Zeinali,
     A. Dadrasi, E. Zand, S. Ghassemi, S. Pourshirazi, O. Alasti, R.S.

@@ -22,7 +22,7 @@ devtools::install_github("assignUser/icrop2r")
 ```
 
 ## Limitations
-The current version does not implement the simulation of trees, foragers, rice and only automatic or rainfed irrigation (no potential production). 
+The current version does not implement the simulation of trees, foragers, rice and only automatic or rainfed irrigation (no potential production) and only simulates one year at a time. 
 
 [^1]: A. Soltani, S.M. Alimagham, A. Nehbandani, B. Torabi, E. Zeinali, A. Dadrasi, E. Zand, S. Ghassemi, S. Pourshirazi, O. Alasti, R.S. Hosseini, M. Zahed, R. Arabameri, Z. Mohammadzadeh, S. Rahban, H. Kamari, H. Fayazi, S. Mohammadi, S. Keramat, V. Vadez, M.K. van Ittersum, T.R. Sinclair,
 SSM-iCrop2: A simple model for diverse crop species over large areas, Agricultural Systems, Volume 182, 2020, 102855,ISSN 0308-521X, https://doi.org/10.1016/j.agsy.2020.102855.
