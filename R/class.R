@@ -96,7 +96,7 @@ Simulation <- R6Class("Simulation", # nolint
             total_transpiration = transpiration,
             top_layer_transpiration = transpiration_top,
             water_stress_leafs = WSFL,
-            water_stress_dev = WSFD,
+            water_stress_dev = WSFDS,
             water_stress_dm = WSFG,
             NDS = NDS,
             DAP = DAP,
