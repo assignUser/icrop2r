@@ -8,50 +8,29 @@
 [![R-CMD-check](https://github.com/assignUser/icrop2r/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/assignUser/icrop2r/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-The goal of iCrop2R is to …
+This package is an R implementation of the SSM-iCrop2[^1] crop growth
+model. Many Thanks to Afshin Soltani for the permission to port iCrop2
+to R.
 
 ## Installation
 
-You can install the development version of iCrop2R from
-[GitHub](https://github.com/) with:
+You can install iCrop2R from [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("devtools")
 devtools::install_github("assignUser/icrop2r")
 ```
 
-## Example
+## Limitations
 
-This is a basic example which shows you how to solve a common problem:
+The current version does not implement the simulation of trees,
+foragers, rice and only automatic or rainfed irrigation (no potential
+production).
 
-``` r
-library(iCrop2R)
-## basic example code
-```
-
-What is special about using `README.Rmd` instead of just `README.md`?
-You can include R chunks like so:
-
-``` r
-summary(cars)
-#>      speed           dist       
-#>  Min.   : 4.0   Min.   :  2.00  
-#>  1st Qu.:12.0   1st Qu.: 26.00  
-#>  Median :15.0   Median : 36.00  
-#>  Mean   :15.4   Mean   : 42.98  
-#>  3rd Qu.:19.0   3rd Qu.: 56.00  
-#>  Max.   :25.0   Max.   :120.00
-```
-
-You’ll still need to render `README.Rmd` regularly, to keep `README.md`
-up-to-date. `devtools::build_readme()` is handy for this. You could also
-use GitHub Actions to re-render `README.Rmd` every time you push. An
-example workflow can be found here:
-<https://github.com/r-lib/actions/tree/v1/examples>.
-
-You can also embed plots, for example:
-
-<img src="man/figures/README-pressure-1.png" width="100%" />
-
-In that case, don’t forget to commit and push the resulting figure
-files, so they display on GitHub and CRAN.
+[^1]: A. Soltani, S.M. Alimagham, A. Nehbandani, B. Torabi, E. Zeinali,
+    A. Dadrasi, E. Zand, S. Ghassemi, S. Pourshirazi, O. Alasti, R.S.
+    Hosseini, M. Zahed, R. Arabameri, Z. Mohammadzadeh, S. Rahban, H.
+    Kamari, H. Fayazi, S. Mohammadi, S. Keramat, V. Vadez, M.K. van
+    Ittersum, T.R. Sinclair, SSM-iCrop2: A simple model for diverse crop
+    species over large areas, Agricultural Systems, Volume 182, 2020,
+    102855,ISSN 0308-521X, <https://doi.org/10.1016/j.agsy.2020.102855>.

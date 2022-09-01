@@ -7,11 +7,13 @@
 prepare_weather(weather, crop, albedo, rain_mod = 1, temp_mod = 0)
 }
 \arguments{
+\item{weather}{Weather data.}
+
+\item{crop}{Crop data.}
+
 \item{rain_mod}{Multiplicative modifier for precipitation.}
 
 \item{temp_mod}{Additive modifier for temperature.}
-
-\item{sim_env}{Simulation environment created with \code{\link[=create_sim_env]{create_sim_env()}}.}
 }
 \value{
 Updated weather data.

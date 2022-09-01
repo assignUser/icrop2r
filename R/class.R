@@ -1,3 +1,16 @@
+#' Simulate crop growth
+#' 
+#' This class implements the iCrop2 model.
+#' 
+#' @param crop A list containing the variable-values pairs used in the 'crop'-sheet of the excel version.
+#'   This package comes with a version of the iCrop2 crop database [iCrop2R::crops].
+#' @param location A list containing the variable-values pairs used in the 'location'-sheet of the excel version.
+#'   (Only the actual variables, not sheet names or row numbers.)
+#' @param management A list containing the variable-values pairs used in the 'Management'-sheet of the excel version.
+#' @param soil A list containing the variable-values pairs used in the 'soil'-sheet of the excel version.
+#'   Can be generated from german-style soil profiles with [german_soil()]
+#' 
+#' @seealso https://doi.org/10.1016/j.agsy.2020.102855
 #' @export
 Simulation <- R6Class("Simulation", # nolint
   public = list(
@@ -13,6 +26,7 @@ Simulation <- R6Class("Simulation", # nolint
       self$location <- location
       self$management <- management
       self$soil <- soil
+      stopifnot(management$water %in% 1:2)
       if (!"hydration_depth" %in% names(self$soil)) {
         self$soil$hydration_depth <- min(hydration_depth, self$soil$soil_depth)
       }
@@ -61,7 +75,6 @@ Simulation <- R6Class("Simulation", # nolint
           private$LAI_step(state)
           private$dry_matter_step(state)
           if (run_water_step) {
-            # TODO implement checks on water selection
             private$water_step(state)
           }
           with(state, data.frame(
@@ -276,7 +289,6 @@ Simulation <- R6Class("Simulation", # nolint
             days_since_wetting <- 1
           }
         }
-        # irrigation_mm <- IRGW
         # TODO Irrigation by fixed days
 
         # EWAT - Water exploitation by root growth

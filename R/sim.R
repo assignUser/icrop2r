@@ -123,7 +123,8 @@ find_sow_date <- function(data,
 #' Update Weather
 #'
 #' Updates the weather with modifiers and calculates snow and snow melt.
-#' @param sim_env Simulation environment created with [create_sim_env()].
+#' @param weather Weather data.
+#' @param crop Crop data.
 #' @param temp_mod Additive modifier for temperature.
 #' @param rain_mod Multiplicative modifier for precipitation.
 #' @return Updated weather data.
