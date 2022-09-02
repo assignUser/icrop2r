@@ -1,6 +1,6 @@
 Package: iCrop2R
 Title: Implementation Of The SSM-iCrop2 Crop Modell 
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: 
     person("Jacob", "Wujciak", , "jacob@wujciak.de", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-7281-3989"))
